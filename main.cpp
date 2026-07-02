@@ -3,10 +3,10 @@
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication a(argc, argv); //Pošto nema GUI, koristi se QCoreApplication, aka nema GUI samo event loop
-    //zasto event loop? -> zato što Qt koristi asinhroni signal-slot mehanizam za obradu mrežnih događaja
+    QCoreApplication a(argc, argv); 
+    
     FTPProxy proxy;
-    if (!proxy.start()) { //Event loop čeka TCP događaje
+    if (!proxy.start()) { 
         return -1;
     }
 
