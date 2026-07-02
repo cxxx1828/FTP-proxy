@@ -5,18 +5,18 @@
 #define FTP_SERVER_IP "127.0.0.1"
 #define FTP_SERVER_PORT 21
 
-FTPProxy::FTPProxy(QObject *parent) //konstruktor
+FTPProxy::FTPProxy(QObject *parent) 
     : QObject(parent),
     clientSocket(nullptr),
     serverSocket(nullptr)
 {
     connect(&proxyServer, &QTcpServer::newConnection,
-            this, &FTPProxy::acceptClient); // kad neko pokusa da se poveze na proksi, pozovi funkciju acceptClient()
+            this, &FTPProxy::acceptClient); 
 }
 
 bool FTPProxy::start()
 {
-    if (!proxyServer.listen(QHostAddress::Any, PROXY_PORT)) { //proxy počinje da sluša port 2121
+    if (!proxyServer.listen(QHostAddress::Any, PROXY_PORT)) { 
         qCritical() << "Proxy failed to start";
         return false;
     }
@@ -29,30 +29,29 @@ bool FTPProxy::start()
 
 void FTPProxy::acceptClient()
 {
-    // Očisti prethodnu konekciju ako postoji
+   
     if (clientSocket || serverSocket) {
         cleanupConnections();
     }
 
-    clientSocket = proxyServer.nextPendingConnection(); //sada proxy ima vezu ka klijentu.
+    clientSocket = proxyServer.nextPendingConnection(); 
     qDebug() << "Client connected from"
              << clientSocket->peerAddress().toString();
 
     serverSocket = new QTcpSocket(this);
-    serverSocket->connectToHost(FTP_SERVER_IP, FTP_SERVER_PORT);// Proxy se povezuje na 127.0.0.1:21, to je pravi FTP server (npr. vsftpd).
-
+    serverSocket->connectToHost(FTP_SERVER_IP, FTP_SERVER_PORT);
     connect(clientSocket, &QTcpSocket::readyRead,
-            this, &FTPProxy::fromClient);// kad klijent salje podatke
+            this, &FTPProxy::fromClient);
     connect(serverSocket, &QTcpSocket::readyRead,
-            this, &FTPProxy::fromServer);// kad server posalje podatke
+            this, &FTPProxy::fromServer);
 
     connect(clientSocket, &QTcpSocket::disconnected,
-            this, &FTPProxy::clientDisconnected);// -||- samo za diskonektovanje
+            this, &FTPProxy::clientDisconnected);
     connect(serverSocket, &QTcpSocket::disconnected,
             this, &FTPProxy::serverDisconnected);
 }
 
-void FTPProxy::fromClient() // funkcija se poziva kada klijent pošalje komandu
+void FTPProxy::fromClient() 
 {
     if (!clientSocket || !serverSocket) return;
 
@@ -61,23 +60,23 @@ void FTPProxy::fromClient() // funkcija se poziva kada klijent pošalje komandu
 
     qDebug() << "CLIENT -> SERVER:" << cmd;
 
-    // Blokiraj TLS/SSL
-    if (cmd.startsWith("AUTH TLS") || cmd.startsWith("AUTH SSL")) { //ne podrzava TLS, nema enkripcije
+  
+    if (cmd.startsWith("AUTH TLS") || cmd.startsWith("AUTH SSL")) { 
         clientSocket->write("500 TLS not supported\r\n");
         return;
     }
 
-    // Log za QUIT komandu
+    
     if (cmd.startsWith("QUIT")) {
         qDebug() << "QUIT command received";
     }
 
     if (serverSocket->state() == QAbstractSocket::ConnectedState) {
-        serverSocket->write(data); //proxy ne menja komandu – samo je prosleđuje.
+        serverSocket->write(data); 
     }
 }
 
-void FTPProxy::fromServer() //funkcija se poziva kada server pošalje odgovor
+void FTPProxy::fromServer() 
 {
     if (!clientSocket || !serverSocket) return;
 
@@ -88,13 +87,13 @@ void FTPProxy::fromServer() //funkcija se poziva kada server pošalje odgovor
 
     qDebug() << "SERVER -> CLIENT:" << response;
 
-    // Log za QUIT odgovor
+    
     if (response.startsWith("221")) {
         qDebug() << "Server sent QUIT response: 221 Goodbye";
     }
 
     if (clientSocket->state() == QAbstractSocket::ConnectedState) {
-        clientSocket->write(data); // samo prosledjuje klijentu, proxy ne menja odgovor
+        clientSocket->write(data); 
     }
 }
 
