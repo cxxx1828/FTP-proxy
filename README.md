@@ -1,65 +1,96 @@
 # FTP Proxy Server
 
-This project presents the implementation of a **transparent FTP proxy server** developed in C++ using the Qt framework (QTcpServer and QTcpSocket).
+This repository contains the implementation of an asynchronous, multi-client **FTP proxy server** developed in C++ using the Qt framework (`QTcpServer` and `QTcpSocket`).
 
-The proxy server acts as an intermediary between an FTP client and a real FTP server. It forwards FTP control commands and server responses without modifying them.
-
-The implementation demonstrates understanding of:
-
-- TCP socket communication
-- Client–server architecture
-- Event-driven programming using Qt
-- FTP protocol fundamentals
-- Proxy server design principles
+The proxy operates as an intermediary between FTP clients and an upstream FTP server, forwarding control commands, handling dynamic passive data channels (`PASV` / `EPSV`), and enforcing connection isolation across concurrent sessions.
 
 ---
 
-## Architecture
+## Key Features
 
-The communication flow is structured as follows:
+* **Asynchronous Session Management**: Handles multiple concurrent client connections via session-isolated `ProxySession` workers.
+* **TCP Stream Framing**: Buffers incoming byte streams to process FTP control commands strictly on `\r\n` line boundaries.
+* **Passive Data Tunneling**:
+* Intercepts and parses `227 Entering Passive Mode` and `229 Entering Extended Passive Mode` responses.
+* Dynamically binds local data proxy listeners to forward data channel traffic during directory listing (`LIST`) and file transfer operations (`RETR`, `STOR`).
 
-FTP Client → FTP Proxy (port 2121) → FTP Server (port 21)
 
-The proxy:
-- Listens for client connections on port 2121
-- Establishes a connection to the real FTP server on port 21
-- Forwards commands from client to server
-- Forwards responses from server to client
-- Logs FTP communication
-- Blocks TLS/SSL authentication commands
+* **TLS Fallback Handling**: Explicitly rejects unsupported `AUTH TLS` and `AUTH SSL` requests to prevent command pipeline corruption.
+* **CLI Configuration & Logging**: Includes command-line options for host and port configuration alongside structured logging categories.
 
 ---
 
-## Technologies Used
+## System Architecture
 
-- C++
-- Qt 6 (QTcpServer, QTcpSocket)
-- Linux
-- Git
+```
+[ FTP Client ]
+      │
+      │ Control Channel (Port 2121)
+      ▼
+┌────────────────────────────────────────────────────────┐
+│ FTPProxy Listener                                      │
+│   └── ProxySession                                     │
+│         ├── Control Channel (PASV/EPSV Rewriting)      │
+│         └── Dynamic Data Proxy Server                  │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+                           │ Upstream Control Channel (Port 21)
+                           ▼
+                 [ Upstream FTP Server ]
 
----
-
-## Features
-
-- Transparent forwarding of FTP control channel
-- Logging of client and server communication
-- Graceful connection cleanup
-- Basic filtering of unsupported TLS commands
-
----
-
-## How to Run
-
-1. Make sure an FTP server (e.g., vsftpd) is running on port 21.
-2. Build the project using Qt Creator.
-3. Run the proxy application.
-4. Connect using an FTP client (e.g., FileZilla) to:
-
-   Host: 127.0.0.1  
-   Port: 2121  
+```
 
 ---
 
-## Educational Purpose
+## Technical Stack
 
-This project was developed as part of the course requirements to demonstrate practical understanding of network communication and protocol-level proxy implementation.
+* **Language**: C++17
+* **Framework**: Qt 6 (`Qt::Network`, `Qt::Core`)
+* **Build System**: CMake 3.16+
+
+---
+
+## Build Instructions
+
+```bash
+mkdir build && cd build
+cmake ..
+cmake --build . --config Release
+
+```
+
+---
+
+## Usage
+
+```bash
+./QtFtpProxy [options]
+
+```
+
+### Command-Line Arguments
+
+| Flag | Long Option | Default | Description |
+| --- | --- | --- | --- |
+| `-p` | `--port` | `2121` | Local port for the proxy to listen on |
+| `-t` | `--target` | `127.0.0.1` | IP address or hostname of the target FTP server |
+| `-r` | `--remote-port` | `21` | Control port of the target FTP server |
+| `-h` | `--help` | — | Display command-line options |
+| `-v` | `--version` | — | Display application version |
+
+---
+
+## Testing
+
+Establish a connection using `curl` or any FTP client configured for unencrypted (plain) FTP:
+
+```bash
+curl -v ftp://127.0.0.1:2121/ --user username:password
+
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License.
