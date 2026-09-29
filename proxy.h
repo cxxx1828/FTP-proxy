@@ -1,59 +1,36 @@
-#ifndef PROXY_SESSION_H
-#define PROXY_SESSION_H
+#ifndef PROXY_H
+#define PROXY_H
 
 #include <QObject>
-#include <QTcpSocket>
 #include <QTcpServer>
+#include <QMap>
 #include <QUuid>
-#include <QRegularExpression>
+#include "proxy_session.h"
 
-class ProxySession : public QObject
+struct ProxyConfig {
+    quint16 listenPort{2121};
+    QString targetHost{"127.0.0.1"};
+    quint16 targetPort{21};
+};
+
+class FTPProxy : public QObject
 {
     Q_OBJECT
 public:
-    explicit ProxySession(QUuid id, QTcpSocket *clientSock, const QString &targetHost, quint16 targetPort, QObject *parent = nullptr);
-    ~ProxySession() override;
+    explicit FTPProxy(const ProxyConfig &config, QObject *parent = nullptr);
+    ~FTPProxy() override;
 
-    QUuid id() const { return m_id; }
-    void start();
-
-signals:
-    void finished(QUuid id);
+    bool start();
+    void stop();
 
 private slots:
-    void onClientReadyRead();
-    void onServerReadyRead();
-    void onClientDisconnected();
-    void onServerDisconnected();
-    void onErrorOccurred(QAbstractSocket::SocketError socketError);
-    void onDataChannelNewConnection();
+    void acceptClient();
+    void onSessionFinished(QUuid id);
 
 private:
-    void processClientCommand(const QByteArray &line);
-    void processServerResponse(const QByteArray &line);
-    
-    void setupPassiveDataProxy(const QString &ip, quint16 port);
-    void setupExtendedPassiveDataProxy(quint16 port);
-
-    QUuid m_id;
-    QTcpSocket *m_clientSocket{nullptr};
-    QTcpSocket *m_serverSocket{nullptr};
-    
-    QString m_targetHost;
-    quint16 m_targetPort;
-
-    QByteArray m_clientBuffer;
-    QByteArray m_serverBuffer;
-
-    // Passive Data Channel Tunneling
-    QTcpServer *m_dataProxyServer{nullptr};
-    QTcpSocket *m_clientDataSocket{nullptr};
-    QTcpSocket *m_serverDataSocket{nullptr};
-    
-    QString m_pasvTargetIp;
-    quint16 m_pasvTargetPort{0};
-    
-    bool m_isEpsv{false};
+    ProxyConfig m_config;
+    QTcpServer m_proxyServer;
+    QMap<QUuid, ProxySession*> m_sessions;
 };
 
-#endif // PROXY_SESSION_H
+#endif // PROXY_H
